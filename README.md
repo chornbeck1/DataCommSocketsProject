@@ -1,2 +1,2 @@
 # DataCommSocketsProject
-Working iterative server so far
+Working iterative server so far.
