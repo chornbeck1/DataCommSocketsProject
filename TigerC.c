@@ -52,11 +52,8 @@ int main(int argc, char const *argv[])
                
         //Retreive input
         fgets(input, MAX_BUFFER, stdin);
-        printf("Input: %s\n",input);
         strncpy(buffer,input,strlen(input));
-        printf("Buffer: %s\n",buffer);
         command=strtok(buffer, " \n");
-        printf("Command: %s\n",command);
         
         
         //If command is to connect, and not already connected
@@ -145,7 +142,6 @@ int main(int argc, char const *argv[])
                 char* fileName=strtok(NULL, " \n"); 
                 strcat(filePath, clientFilesPath);
                 strcat(filePath, fileName); 
-                printf("Writing input '%s' to server\n",input);
                 write(socketNum,input,strlen(input));
                 //Read back success/failure message from server and parse
                 read(socketNum,serverResponse,1024);

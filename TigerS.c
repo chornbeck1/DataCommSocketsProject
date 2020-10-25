@@ -1,6 +1,10 @@
-// Tiger Server that handles user authentication, with username creation.
-// Users able to handle the action to download and upload files.
-// 
+//Server that handles user login, upload, and download
+#define PORT 4444
+#define MAX_BUFFER 120
+#define MAX_FILES  100
+#define MAX_USERS 101
+#define MAX_LENGTH 20
+#define _GNU_SOURCE
 #include <errno.h>
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
@@ -13,19 +17,9 @@
 #include <netinet/in.h> 
 #include <string.h>
 #include "UserHeader.h"
-#define PORT 4444
-#define TRUE 1
-#define FALSE 0
-#define MAX_BUFFER 120
-#define MAX_FILES  100
-#define MAX_USERS 101
-#define MAX_LENGTH 20
-#define RECEIVED "\n Data has been received."
-#define INVALID "Received wrong input."
-#define users_database "users_database.txt"
 
 
-void clear_buffer(char* buffer){
+void ClearBuffer(char* buffer){
     for(int i = 0; i < 1024; i++)
     {
         buffer[i] = '\0';
@@ -99,10 +93,7 @@ int main(int argc, char const *argv[])
     while(1) {
 		if(userConnected==1)
 		{
-			//fflush(0);
-			//Clear buffers
-			//clear_buffer(final_path);
-			clear_buffer(buffer);
+			ClearBuffer(buffer);
 			
 			//Receive command from the client
 			printf("Waiting for client command...\n>>> ");
@@ -121,7 +112,7 @@ int main(int argc, char const *argv[])
 					printf("\nInvalid Command Received \n");
 					printf("%s\n",buffer);
 					printf("\nPlease input another command. \n");
-					clear_buffer(buffer);
+					ClearBuffer(buffer);
 				}
 				else {
 					//Parse apart the possible commands
@@ -170,7 +161,7 @@ int main(int argc, char const *argv[])
 				}
 			}
 			else if (strncmp(command1,"tget", sizeof(buffer))==0) {
-				clear_buffer(final_path);
+				ClearBuffer(final_path);
 				printf("Input received.\n");
 				printf("File Download Requested\n");
 				if(strncmp(command2, "", sizeof(buffer)) == 0){
@@ -212,7 +203,7 @@ int main(int argc, char const *argv[])
 				}
 			}
 			else if (strncmp(command1,"tput", sizeof(buffer))==0) {
-				clear_buffer(final_path);
+				ClearBuffer(final_path);
 				printf("Input received.\n");
 				if(strncmp(command2, "", sizeof(buffer)) == 0){
 					//Send back initial response as failure
