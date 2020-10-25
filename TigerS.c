@@ -98,26 +98,39 @@ int main(int argc, char const *argv[])
     while(1) {
 		if(userConnected==1)
 		{
+			//fflush(0);
 			//Clear buffers
-			clear_buffer(final_path);
+			//clear_buffer(final_path);
 			clear_buffer(buffer);
 			
 			//Receive command from the client
-			recv(new_socket, buffer, 1024, 0);
-			if (buffer == NULL){
-				printf("%s\n",buffer);
-				printf("\nInvalid Command Received \n");
-				printf("%s\n",buffer);
-				printf("\nPlease input another command. \n");
-				clear_buffer(buffer);
+			printf("Waiting for client command...\n>>> ");
+			//Check if client has disconnected?
+			if(recv(new_socket,buffer,sizeof(buffer),MSG_PEEK | MSG_DONTWAIT)==0)
+			{
+				printf("Client Disconnected\n");
+				command1="exit";
 			}
-			else {
-				//Parse apart the possible commands
-				command1 = strtok(buffer, " \n");
-				command2 = strtok(NULL, " \n");
-				command3 = strtok(NULL, " \n");
-				command4 = strtok(NULL, " \n");
+			else
+			{
+				read(new_socket, buffer, 1024);
+				printf("%s\n",buffer);
+				if (buffer == NULL){
+					printf("%s\n",buffer);
+					printf("\nInvalid Command Received \n");
+					printf("%s\n",buffer);
+					printf("\nPlease input another command. \n");
+					clear_buffer(buffer);
+				}
+				else {
+					//Parse apart the possible commands
+					command1 = strtok(buffer, " \n");
+					command2 = strtok(NULL, " \n");
+					command3 = strtok(NULL, " \n");
+					command4 = strtok(NULL, " \n");
+				}
 			}
+			
 			
 			if (strncmp(command1,"tconnect", sizeof(buffer))==0) {
 				printf("\nInput received.");
@@ -178,16 +191,25 @@ int main(int argc, char const *argv[])
 						write(new_socket, "1", 1);
 						printf("Ready to Send\n");
 						read(new_socket,buffer,MAX_BUFFER);
+						int total=0;
 						while (1) {
 							unsigned char buff[256]={0};
 							int nread = fread(buff,1,256,download_file);
-							if(nread > 0){
-								printf("Sending \n");
-								write(new_socket, buff, nread);
+							if(nread==0)
+							{
+								//Send 'done' code to prevent perfect-byte transfer
+								write(new_socket, "10110011011",11);
 							}
-							if(nread < 256){
+							if(nread > 0){
+								
+								printf("Sending %d Bytes\n",nread);
+								write(new_socket, buff, nread);
+								total+=nread;
+							}
+							if(nread < 256)
+							{
 								if(feof(download_file)){
-									printf("End of file.\n");
+									printf("End of file.\nSuccessfully sent %d bytes\n",total);
 								}
 								if(ferror(download_file)){
 									printf("Error reading\n");
@@ -199,6 +221,7 @@ int main(int argc, char const *argv[])
 				}
 			}
 			else if (strncmp(command1,"tput", sizeof(buffer))==0) {
+				clear_buffer(final_path);
 				printf("Input received.\n");
 				if(strncmp(command2, "", sizeof(buffer)) == 0){
 					//Send back initial response as failure
@@ -210,7 +233,7 @@ int main(int argc, char const *argv[])
 					//Start to prepare a file to receive the data
 					strcat(final_path,files_folder);
 					strcat(final_path,command2);
-					fp = fopen(final_path,"ab");
+					fp = fopen(final_path,"wb");
 					if(NULL == fp){
 						printf("Error opening file");
 						return 1;
@@ -218,25 +241,43 @@ int main(int argc, char const *argv[])
 					printf("Ready to Accept...\n");
 					//Send back initial response as success
 					write(new_socket, "1", 1);
+					int total=0;
 					while((bytesReceived = recv(new_socket,recvBuff,256,0)) > 0){
-						printf("Bytes received: %d\n", bytesReceived);
-						int written = fwrite(recvBuff,1,bytesReceived,fp);
-						printf("Wrote %d bytes.\n", written);
+                        if(bytesReceived<256)
+                        {
+                            if(strstr(recvBuff,"10110011011")==NULL)
+                            {
+                                int written = fwrite(recvBuff,1,bytesReceived,fp);
+                                printf("Wrote %d bytes.\n", written); 
+                            }
+                        }
+                        else
+                        {
+							int written = fwrite(recvBuff,1,bytesReceived,fp);
+							printf("Wrote %d bytes.\n", written);
+							total+=bytesReceived;
+						}
 						if(bytesReceived < 256){
-							printf("File Transfer Complete\n");
+							printf("File Transfer Complete\nSuccessfully received %d bytes\n",total);
 							break;
 						}
 					}
-					fclose(fp);
+					if(fclose(fp)!=0)
+					{
+						printf("Error closing filestream\n");
+					}
 					if(bytesReceived < 0)
 					{
 						printf("\n Write Error \n");
 					}
 				}
 			}
-			else if (strncmp(buffer,"exit", sizeof(buffer))==0){
+			else if (strncmp(command1,"exit", sizeof(buffer))==0){
 				printf("User Disconnection\n");
-				close(new_socket);
+                if(close(new_socket)<0)
+                {
+                    printf("Failure closing server-side socket\n");
+                }
 				userConnected=0;
 			}
 		}

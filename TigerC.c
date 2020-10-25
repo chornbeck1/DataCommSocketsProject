@@ -40,12 +40,15 @@ int main(int argc, char const *argv[])
            "Your options are: \n"
            "tconnect <TigerS IP Address> <User> <Password>\n"
            "tget <File Name>\n"
-           "tput <File Name>\n");
+           "tput <File Name>\n"
+           "exit");
     
     while(1)
     {
+        ClearBuffer(input);
+        ClearBuffer(buffer);
         //Ask user for input.
-        printf(">>> ");
+        printf("\n\n>>> ");
                
         //Retreive input
         fgets(input, MAX_BUFFER, stdin);
@@ -56,7 +59,7 @@ int main(int argc, char const *argv[])
         if(strncmp(command,"tconnect",strlen(command))==0)
         {
             //Already connected
-            if(connected>0){printf("Already connected to server. Please exit to reconnect anew.\n");}
+            if(connected>0){printf("Already connected to server\n");}
             //New connection
             else
             {
@@ -106,17 +109,26 @@ int main(int argc, char const *argv[])
                 
             }
         }
-        //Close the socket, maybe return -1 in future
+        //Close the socket
         else if(strncmp(command,"exit",strlen(command))==0)
         {
             if(connected==1)
             {
                 //Tell server to close socket
+                printf("Initiating socket shutdown...\n");
                 write(socketNum,input,strlen(input));
-                //Close socket client-side
-                close(socketNum);
-                connected=0;
+                int status=1;
+                if(status<0 || close(socketNum)<0)
+                {
+                    printf("Failure closing client-side socket\n");
+                }
+                else
+                {
+                    printf("Socket Closed.\n");
+                }
             }
+            connected=0;
+            return -1;
         }
         //If connected and requesting tget
         else if(strncmp(command,"tget",strlen(command))==0)
@@ -136,21 +148,34 @@ int main(int argc, char const *argv[])
                 if(status>0)
                 {              
                     printf("Downloading to %s\n",filePath);
-                    fp=fopen(filePath,"ab");
+                    fp=fopen(filePath,"wb");
                     if(NULL == fp){
                         printf("Error opening file");
                         return 1;
                     }
                     printf("Ready to receive\n");
                     write(socketNum,"1",1);
+                    int total=0;
                     while((bytesReceived = read(socketNum,recvBuff,256)) > 0){
-                        int written = fwrite(recvBuff,1,bytesReceived,fp);
-                        printf("Wrote %d bytes.\n", written);
+                        if(bytesReceived==11)
+                        {
+                            if(strncmp(recvBuff,"10110011011",11)!=0)
+                            {
+                                int written = fwrite(recvBuff,1,bytesReceived,fp);
+                                printf("Wrote %d bytes.\n", written); 
+                            }
+                        }
+                        else
+                        {
+                            int written = fwrite(recvBuff,1,bytesReceived,fp);
+                            printf("Wrote %d bytes.\n", written);
+                            total+=bytesReceived;
+                        }
                         if(bytesReceived < 256){
-                            printf("File Transfer Complete\n");
                             break;
                         }
                     }
+                    printf("File Transfer Complete\nSuccessfully downloaded %d bytes\n",total);
                     fclose(fp);
                     if(bytesReceived < 0)
                     {
@@ -183,16 +208,23 @@ int main(int argc, char const *argv[])
                     write(socketNum,input,strlen(input));
                     //Read back success/failure message from server and parse
                     read(socketNum,serverResponse,1024);
+                    int total=0;
                     while (1) {
                         unsigned char buff[256]={0};
                         int nread = fread(buff,1,256,fp);
+                        if(nread==0)
+                        {
+                            //Send 'done' code to prevent perfect-byte transfer
+                            write(socketNum, "10110011011",11);
+                        }
                         if(nread > 0){
-                            printf("Uploading...\n");
+                            printf("Uploading %d Bytes...\n",nread);
                             write(socketNum, buff, nread);
+                            total+=nread;
                         }
                         if(nread < 256){
                             if(feof(fp)){
-                                printf("Upload Complete\n");
+                                printf("Upload Complete\nSuccesfully sent %d bytes\n",total);
                             }
                             if(ferror(fp)){
                                 printf("Error reading\n");
@@ -200,7 +232,10 @@ int main(int argc, char const *argv[])
                             break;
                         }
                     }
-                    fclose(fp);
+                    if(fclose(fp)!=0)
+                    {
+                        printf("Failure closing file\n");
+                    }
                 }
             }
         }         
