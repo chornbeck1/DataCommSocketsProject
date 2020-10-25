@@ -52,8 +52,12 @@ int main(int argc, char const *argv[])
                
         //Retreive input
         fgets(input, MAX_BUFFER, stdin);
+        printf("Input: %s\n",input);
         strncpy(buffer,input,strlen(input));
+        printf("Buffer: %s\n",buffer);
         command=strtok(buffer, " \n");
+        printf("Command: %s\n",command);
+        
         
         //If command is to connect, and not already connected
         if(strncmp(command,"tconnect",strlen(command))==0)
@@ -141,13 +145,14 @@ int main(int argc, char const *argv[])
                 char* fileName=strtok(NULL, " \n"); 
                 strcat(filePath, clientFilesPath);
                 strcat(filePath, fileName); 
+                printf("Writing input '%s' to server\n",input);
                 write(socketNum,input,strlen(input));
                 //Read back success/failure message from server and parse
                 read(socketNum,serverResponse,1024);
                 int status=atoi(strtok(serverResponse, " \n"));
                 if(status>0)
                 {              
-                    printf("Downloading to %s\n",filePath);
+                    //printf("Downloading to %s\n",filePath);
                     fp=fopen(filePath,"wb");
                     if(NULL == fp){
                         printf("Error opening file");
@@ -157,23 +162,10 @@ int main(int argc, char const *argv[])
                     write(socketNum,"1",1);
                     int total=0;
                     while((bytesReceived = read(socketNum,recvBuff,256)) > 0){
-                        if(bytesReceived==11)
-                        {
-                            if(strncmp(recvBuff,"10110011011",11)!=0)
-                            {
-                                int written = fwrite(recvBuff,1,bytesReceived,fp);
-                                printf("Wrote %d bytes.\n", written); 
-                            }
-                        }
-                        else
-                        {
-                            int written = fwrite(recvBuff,1,bytesReceived,fp);
-                            printf("Wrote %d bytes.\n", written);
-                            total+=bytesReceived;
-                        }
-                        if(bytesReceived < 256){
+                        if(strncmp(recvBuff,"EOF",3)==0)
                             break;
-                        }
+                        fwrite(recvBuff,1,bytesReceived,fp);
+                        total+=bytesReceived;
                     }
                     printf("File Transfer Complete\nSuccessfully downloaded %d bytes\n",total);
                     fclose(fp);
@@ -208,33 +200,30 @@ int main(int argc, char const *argv[])
                     write(socketNum,input,strlen(input));
                     //Read back success/failure message from server and parse
                     read(socketNum,serverResponse,1024);
-                    int total=0;
-                    while (1) {
-                        unsigned char buff[256]={0};
-                        int nread = fread(buff,1,256,fp);
-                        if(nread==0)
-                        {
-                            //Send 'done' code to prevent perfect-byte transfer
-                            write(socketNum, "10110011011",11);
-                        }
-                        if(nread > 0){
-                            printf("Uploading %d Bytes...\n",nread);
+                    int status=atoi(strtok(serverResponse, " \n"));
+                    if(status>0)
+                    {
+                        int total=0;
+                        while (1) {
+                            unsigned char buff[256]={0};
+                            int nread = fread(buff,1,256,fp);
+                            if(nread==0)
+                            {
+                                write(socketNum, "EOF",3);
+                                break;
+                            }
                             write(socketNum, buff, nread);
                             total+=nread;
                         }
-                        if(nread < 256){
-                            if(feof(fp)){
-                                printf("Upload Complete\nSuccesfully sent %d bytes\n",total);
-                            }
-                            if(ferror(fp)){
-                                printf("Error reading\n");
-                            }
-                            break;
+                        printf("Upload Complete\nSuccesfully sent %d bytes\n",total);
+                        if(fclose(fp)!=0)
+                        {
+                            printf("Failure closing file\n");
                         }
                     }
-                    if(fclose(fp)!=0)
+                    else
                     {
-                        printf("Failure closing file\n");
+                        printf("Failure during tput\n");
                     }
                 }
             }

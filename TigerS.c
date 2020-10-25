@@ -2,6 +2,7 @@
 // Users able to handle the action to download and upload files.
 // 
 #include <errno.h>
+#include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/time.h>
@@ -69,7 +70,7 @@ int main(int argc, char const *argv[])
     // Creating socket file descriptor 
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
     { 
-        perror("socket failed"); 
+        printf("Socket Failed to be created\n"); 
         exit(EXIT_FAILURE); 
     } 
        
@@ -77,23 +78,23 @@ int main(int argc, char const *argv[])
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
                                                   &opt, sizeof(opt))) 
     { 
-        perror("setsockopt"); 
+        printf("Socket options not set\n");
         exit(EXIT_FAILURE); 
     } 
     address.sin_family = AF_INET; 
-    address.sin_addr.s_addr = INADDR_ANY; 
+    address.sin_addr.s_addr = inet_addr("127.0.0.1"); 
     address.sin_port = htons( PORT ); 
        
     // Forcefully attaching socket to the port 8080 
     if (bind(server_fd, (struct sockaddr *)&address,  
                                  sizeof(address))<0) 
     { 
-        perror("bind failed"); 
+        printf("Socket Bind Failure\n");
         exit(EXIT_FAILURE); 
     } 
     printf("Server socket bound.\n");
     printf("Listening for clients...\n");
-	listen(server_fd,3);
+	listen(server_fd,MAX_USERS);
 
     while(1) {
 		if(userConnected==1)
@@ -115,7 +116,7 @@ int main(int argc, char const *argv[])
 			{
 				read(new_socket, buffer, 1024);
 				printf("%s\n",buffer);
-				if (buffer == NULL){
+				if (buffer == NULL || strcmp(buffer,"")==0){
 					printf("%s\n",buffer);
 					printf("\nInvalid Command Received \n");
 					printf("%s\n",buffer);
@@ -190,33 +191,23 @@ int main(int argc, char const *argv[])
 					{
 						write(new_socket, "1", 1);
 						printf("Ready to Send\n");
-						read(new_socket,buffer,MAX_BUFFER);
+						if(read(new_socket,buffer,MAX_BUFFER)<=0)
+						{
+							printf("Failure reading from socket\n");
+						}
 						int total=0;
 						while (1) {
 							unsigned char buff[256]={0};
 							int nread = fread(buff,1,256,download_file);
 							if(nread==0)
 							{
-								//Send 'done' code to prevent perfect-byte transfer
-								write(new_socket, "10110011011",11);
-							}
-							if(nread > 0){
-								
-								printf("Sending %d Bytes\n",nread);
-								write(new_socket, buff, nread);
-								total+=nread;
-							}
-							if(nread < 256)
-							{
-								if(feof(download_file)){
-									printf("End of file.\nSuccessfully sent %d bytes\n",total);
-								}
-								if(ferror(download_file)){
-									printf("Error reading\n");
-								}
+								write(new_socket,"EOF",3);
 								break;
 							}
+							write(new_socket, buff, nread);
+							total+=nread;
 						}
+						printf("End of file.\nSuccessfully sent %d bytes\n",total);
 					}
 				}
 			}
@@ -235,7 +226,7 @@ int main(int argc, char const *argv[])
 					strcat(final_path,command2);
 					fp = fopen(final_path,"wb");
 					if(NULL == fp){
-						printf("Error opening file");
+						printf("Error opening file\n");
 						return 1;
 					}
 					printf("Ready to Accept...\n");
@@ -243,25 +234,12 @@ int main(int argc, char const *argv[])
 					write(new_socket, "1", 1);
 					int total=0;
 					while((bytesReceived = recv(new_socket,recvBuff,256,0)) > 0){
-                        if(bytesReceived<256)
-                        {
-                            if(strstr(recvBuff,"10110011011")==NULL)
-                            {
-                                int written = fwrite(recvBuff,1,bytesReceived,fp);
-                                printf("Wrote %d bytes.\n", written); 
-                            }
-                        }
-                        else
-                        {
-							int written = fwrite(recvBuff,1,bytesReceived,fp);
-							printf("Wrote %d bytes.\n", written);
-							total+=bytesReceived;
-						}
-						if(bytesReceived < 256){
-							printf("File Transfer Complete\nSuccessfully received %d bytes\n",total);
+                        if(strncmp(recvBuff,"EOF",3)==0)
 							break;
-						}
+						fwrite(recvBuff,1,bytesReceived,fp);
+						total+=bytesReceived;
 					}
+					printf("File Transfer Complete\nSuccessfully received %d bytes\n",total);
 					if(fclose(fp)!=0)
 					{
 						printf("Error closing filestream\n");
@@ -284,10 +262,12 @@ int main(int argc, char const *argv[])
         //Accept the next incoming connection
         else
         {
+			printf("Looking for connections....\n");
             new_socket=accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addresslength);
             printf("---Connection acquired---\n");
             userConnected=1;
         }
     }
+    printf("Broke out of while loop\n");
     return 0; 
 } 

@@ -11,11 +11,11 @@ Additional logins can be added in serverFiles/usersList.txt
 in the form of <username> <password> on a new line.
 
 
-OVERVIEW: Run commands in this order
+OVERVIEW: Run commands in this order, preferably in the terminal
 make all
 ./CreateDataFiles.sh
 ./TigerS
-./bashScript.sh
+./bashScript.sh (in a different terminal than the server)
 
 
 PROGRAM COMMANDS	
