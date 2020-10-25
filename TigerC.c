@@ -152,7 +152,6 @@ int main(int argc, char const *argv[])
                 int status=atoi(strtok(serverResponse, " \n"));
                 if(status>0)
                 {              
-                    //printf("Downloading to %s\n",filePath);
                     fp=fopen(filePath,"wb");
                     if(NULL == fp){
                         printf("Error opening file");
@@ -162,6 +161,7 @@ int main(int argc, char const *argv[])
                     write(socketNum,"1",1);
                     int total=0;
                     while((bytesReceived = read(socketNum,recvBuff,256)) > 0){
+                        //If only an EOF is received, server finished sending file.
                         if(strncmp(recvBuff,"EOF",3)==0)
                             break;
                         fwrite(recvBuff,1,bytesReceived,fp);
@@ -207,6 +207,7 @@ int main(int argc, char const *argv[])
                         while (1) {
                             unsigned char buff[256]={0};
                             int nread = fread(buff,1,256,fp);
+                            //If can read no more, send specific EOF to client
                             if(nread==0)
                             {
                                 write(socketNum, "EOF",3);
