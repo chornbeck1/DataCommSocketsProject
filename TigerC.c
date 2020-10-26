@@ -103,8 +103,6 @@ int main(int argc, char const *argv[])
                 else
                 {
                     printf("Invalid Credentials\n");
-                    printf("Would you like to create a new account with these credentials? (y/n)\n>>> ");
-                    fgets(input,MAX_BUFFER,stdin);
                 }
                 
                 
